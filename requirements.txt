@@ -5,8 +5,9 @@ pydantic
 pydantic-settings
 python-dotenv
 chromadb
-web3
-neynar-api-client
+web3>=6.0.0,<8.0.0
 asyncpg==0.29.0
 urllib3>=2.0.0
 watchdog
+uvicorn
+fastapi

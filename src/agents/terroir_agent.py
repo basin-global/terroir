@@ -10,6 +10,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
 import asyncpg
 from typing import Dict
+from langchain.schema import Document
 
 class TerroirAgent:
     """Terroir Agent - AI system for managing situs accounts and natural capital"""
@@ -147,6 +148,12 @@ class TerroirAgent:
     async def process_query(self, query: str) -> str:
         """Process query using Claude's intelligence with access to our resources"""
         
+        # Check for refresh docs command
+        if query.lower() in ["refresh docs", "update docs", "reload docs"]:
+            print("Refreshing documentation from GitHub...")
+            self._load_protocol_docs(force_refresh=True)
+            return "Documentation has been refreshed from GitHub repositories."
+        
         # Get any relevant docs but don't force their use
         doc_context = self._get_relevant_docs(query)
         
@@ -159,43 +166,69 @@ class TerroirAgent:
                 if account_data:
                     account_context = f"\nAccount Data:\n{json.dumps(account_data, indent=2)}"
 
+        # Process any commands first (todo, nl, cor, etc)
+        command_response = self._process_todo(query, "", None)
+        if command_response:
+            return command_response
+
         system_prompt = f"""You are Terroir, an AI assistant focused on the BASIN and Situs protocols.
 
-        You have access to:
-        - Your general knowledge and reasoning abilities
-        - Protocol documentation (if relevant to the query)
-        - Account data from our database (if relevant)
-        - Previous conversations and learned facts
-        
-        Feel free to:
-        - Use your judgment on which information sources are most relevant
-        - Combine information from multiple sources
-        - Express uncertainty when appropriate
-        - Ask for clarification if needed
-        - Draw on your general knowledge when appropriate
-        
-        Available Context (use if relevant):
-        {doc_context}
-        {account_context}
-        
-        Previous Conversations:
-        {self.memory.load_memory_variables({}).get('chat_history', '')}
-        
-        Learned Facts:
-        {json.dumps(self.learned_knowledge.get('verified_facts', []), indent=2)}"""
+IMPORTANT:
+- Never make up or fabricate information about BASIN or Situs
+- If you're not sure about something, say so clearly
+- Only use information from the provided documentation
+- It's better to say "I don't know" or "I can't find that in the documentation" than to make assumptions
+
+You have access to:
+- Protocol documentation (if relevant to the query)
+- Account data from our database (if relevant)
+- Previous conversations and learned facts
+
+Available Context (use if relevant):
+{doc_context}
+{account_context}
+
+Previous Conversations:
+{self.memory.load_memory_variables({}).get('chat_history', '')}
+
+Learned Facts:
+{json.dumps(self.learned_knowledge.get('verified_facts', []), indent=2)}"""
 
         message = await self.chat_model.ainvoke(
             system_prompt + "\n\nHuman: " + query
         )
         
-        if message and message.content:
-            return message.content
-        return "I apologize, I need more context to answer that question. Could you provide more details?"
+        # Store any new learnings
+        self._process_new_learning(query, message.content)
+        
+        return message.content if message and message.content else "I apologize, I need more context to answer that question. Could you provide more details?"
 
     def _load_protocol_docs(self):
-        """
-        Load all protocol documentation at startup
-        """
+        """Load all protocol documentation at startup"""
+        # Use data directory for both local and Render
+        cache_dir = os.path.join(os.path.dirname(self.knowledge_file), 'cache')
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_file = os.path.join(cache_dir, 'docs_cache.json')
+        
+        # Try to load from cache first
+        try:
+            if os.path.exists(cache_file) and os.path.getsize(cache_file) > 0:
+                with open(cache_file, 'r') as f:
+                    cached_data = json.load(f)
+                    print(f"\nLoaded {len(cached_data)} documents from cache")
+                    # Convert cached data back to Document objects
+                    self.documents = [
+                        Document(
+                            page_content=doc['content'],
+                            metadata=doc['metadata']
+                        ) for doc in cached_data
+                    ]
+                    return
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"Cache not usable, loading from GitHub: {e}")
+        
+        # Load from GitHub
+        print("Loading documents from GitHub...")
         repos = {
             "docs": ["basin-global/situs-docs", "basin-global/BASIN-Field-Manual"],
             "code": ["basin-global/Situs-Protocol"]
@@ -209,15 +242,26 @@ class TerroirAgent:
         for repo in repos["code"]:
             docs = self.load_github_docs(repo, include_code=True)
             total_docs += len(docs)
+        
+        if total_docs > 0:
+            # Convert documents to serializable format before caching
+            cache_data = [
+                {
+                    'content': doc.page_content,
+                    'metadata': doc.metadata
+                } for doc in self.documents
+            ]
             
-        print(f"\nTotal documents loaded: {total_docs}")
-        if total_docs == 0:
-            print("Warning: No documents were loaded. Responses will be based on core instructions only.")
+            # Save to cache
+            with open(cache_file, 'w') as f:
+                json.dump(cache_data, f)
+            
+            print(f"\nTotal documents loaded and cached: {total_docs}")
+        else:
+            print("Warning: No documents were loaded")
 
     def load_github_docs(self, repo_url: str, branch: str = "main", include_code: bool = False):
-        """
-        Load documentation and optionally code from a GitHub repository
-        """
+        """Load documentation and optionally code from a GitHub repository"""
         try:
             file_types = [".md", ".mdx"]
             if include_code:
@@ -231,13 +275,16 @@ class TerroirAgent:
             )
             
             docs = loader.load()
-            self.documents.extend(docs)
-            print(f"\nLoaded {len(docs)} documents from {repo_url}")
-            # Print first few lines of each doc for verification
+            
+            # Debug loaded docs
+            print(f"\nLoading docs from {repo_url}:")
             for doc in docs:
-                preview = doc.page_content[:100] + "..."
-                print(f"Document: {doc.metadata.get('source')}")
-                print(f"Preview: {preview}\n")
+                print(f"Source: {doc.metadata.get('source', 'unknown')}")
+                if "swiss" in doc.page_content.lower() or "bes" in doc.page_content.lower():
+                    print(f"Found Swiss Re BES content in: {doc.metadata.get('source')}")
+                    print(f"Preview: {doc.page_content[:200]}...")
+            
+            self.documents.extend(docs)
             return docs
             
         except Exception as e:
@@ -421,22 +468,110 @@ class TerroirAgent:
             return None
         finally:
             await conn.close()
-    async def process_query(self, query: str) -> str:
-        # Check for token ID queries
-        if any(word in query.lower() for word in ["token", "id"]) and any(og in query.lower() for og in [".earth", ".basin"]):
-            try:
-                # Extract OG type and token ID
-                og_type = "earth" if ".earth" in query.lower() else "basin"
-                token_id = int(''.join(filter(str.isdigit, query)))
-                
-                # Use existing sql_reader to get account details
-                table_name = f"situs_accounts_{og_type}"
-                if table_name in self.sql_reader.account_tables:
-                    results = await self.sql_reader.get_all_accounts(og_type)
-                    for account in results:
-                        if account['token_id'] == token_id:
-                            return f"Token {token_id} in .{og_type} is account: {account['account_name']}"
-            except Exception as e:
-                print(f"Error looking up token: {e}")
+
+    def _load_protocol_docs(self, force_refresh: bool = False):
+        """Load all protocol documentation at startup"""
+        # Use data directory for both local and Render
+        cache_dir = os.path.join(os.path.dirname(self.knowledge_file), 'cache')
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_file = os.path.join(cache_dir, 'docs_cache.json')
         
-        # Rest of process_query remains the same...
+        # Try to load from cache first
+        try:
+            if os.path.exists(cache_file) and os.path.getsize(cache_file) > 0:
+                with open(cache_file, 'r') as f:
+                    cached_data = json.load(f)
+                    print(f"\nLoaded {len(cached_data)} documents from cache")
+                    # Convert cached data back to Document objects
+                    self.documents = [
+                        Document(
+                            page_content=doc['content'],
+                            metadata=doc['metadata']
+                        ) for doc in cached_data
+                    ]
+                    return
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"Cache not usable, loading from GitHub: {e}")
+        
+        # Load from GitHub
+        print("Loading documents from GitHub...")
+        repos = {
+            "docs": ["basin-global/situs-docs", "basin-global/BASIN-Field-Manual"],
+            "code": ["basin-global/Situs-Protocol"]
+        }
+        
+        total_docs = 0
+        for repo in repos["docs"]:
+            docs = self.load_github_docs(repo)
+            total_docs += len(docs)
+        
+        for repo in repos["code"]:
+            docs = self.load_github_docs(repo, include_code=True)
+            total_docs += len(docs)
+        
+        if total_docs > 0:
+            # Convert documents to serializable format before caching
+            cache_data = [
+                {
+                    'content': doc.page_content,
+                    'metadata': doc.metadata
+                } for doc in self.documents
+            ]
+            
+            # Save to cache
+            with open(cache_file, 'w') as f:
+                json.dump(cache_data, f)
+            
+            print(f"\nTotal documents loaded and cached: {total_docs}")
+        else:
+            print("Warning: No documents were loaded")
+
+    def _process_todo(self, query: str, response: str, source: dict = None):
+        """Process todo commands"""
+        if "todo:" in query.lower():
+            todo_item = query.split("todo:")[1].strip()
+            self.todos["active"].append({
+                "item": todo_item,
+                "created_at": datetime.now().isoformat(),
+                "source": source or "local"
+            })
+            self._save_todos()
+            return f"Added to todo list: {todo_item}"
+            
+        elif "done:" in query.lower():
+            item_id = query.split("done:")[1].strip()
+            try:
+                item_index = int(item_id) - 1
+                if 0 <= item_index < len(self.todos["active"]):
+                    completed_item = self.todos["active"].pop(item_index)
+                    completed_item["completed_at"] = datetime.now().isoformat()
+                    self.todos["completed"].append(completed_item)
+                    self._save_todos()
+                    return f"Marked as done: {completed_item['item']}"
+            except ValueError:
+                pass
+
+        elif "clear:" in query.lower():
+            item_id = query.split("clear:")[1].strip()
+            try:
+                item_index = int(item_id) - 1
+                if 0 <= item_index < len(self.todos["active"]):
+                    cleared_item = self.todos["active"].pop(item_index)
+                    cleared_item["cleared_at"] = datetime.now().isoformat()
+                    self.todos["cleared"].append(cleared_item)
+                    self._save_todos()
+                    return f"Cleared: {cleared_item['item']}"
+            except ValueError:
+                pass
+                
+        elif query.lower() == "show todos":
+            if not self.todos["active"]:
+                return "No active todos."
+            
+            todo_list = "Active Todos:\n"
+            for i, todo in enumerate(self.todos["active"], 1):
+                todo_list += f"{i}. {todo['item']} (added: {todo['created_at']})\n"
+            return todo_list
+
+        elif query.lower() == "refresh docs":
+            self._load_protocol_docs(force_refresh=True)

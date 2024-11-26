@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: terroir
+Version: 0.1
+Requires-Dist: anthropic>=0.8.0
+Requires-Dist: langchain>=0.1.0
+Requires-Dist: chromadb>=0.4.0
+Requires-Dist: beautifulsoup4
+Requires-Dist: requests
+Requires-Dist: selenium
+Requires-Dist: webdriver_manager

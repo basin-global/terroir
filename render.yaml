@@ -3,12 +3,14 @@ services:
     name: terroir-agent
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m src.main
+    startCommand: uvicorn src.main:app --host 0.0.0.0 --port $PORT
     disk:
       name: terroir-cache
-      mountPath: /opt/terroir/cache
+      mountPath: /opt/terroir/data
       sizeGB: 1
     envVars:
+      - key: USER_AGENT
+        value: terroir-agent
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: GITHUB_PERSONAL_ACCESS_TOKEN
@@ -16,5 +18,5 @@ services:
       - key: DATABASE_URL
         sync: false
     cron:
-      - schedule: "0 */6 * * *"  # Every 6 hours
+      - schedule: "0 0 * * 0"
         command: python -m src.tasks.update_docs 
