@@ -1,0 +1,11 @@
+{
+  "devDependencies": {
+    "@types/node": "^22.9.3",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "postgres": "^3.4.5",
+    "viem": "^2.21.50"
+  }
+}

@@ -1,0 +1,20 @@
+terroir/
+├── src/
+│   ├── agents/
+│   │   ├── __init__.py
+│   │   └── terroir_agent.py
+│   ├── chain/
+│   │   ├── __init__.py
+│   │   └── wallet_manager.py
+│   ├── social/
+│   │   ├── __init__.py
+│   │   ├── twitter.py
+│   │   └── warpcast.py
+│   └── config/
+│       ├── __init__.py
+│       └── settings.py
+├── tests/
+│   └── __init__.py
+├── requirements.txt
+├── README.md
+└── .gitignore 

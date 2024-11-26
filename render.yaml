@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: terroir-agent
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m src.main
+    disk:
+      name: terroir-cache
+      mountPath: /opt/terroir/cache
+      sizeGB: 1
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GITHUB_PERSONAL_ACCESS_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+    cron:
+      - schedule: "0 */6 * * *"  # Every 6 hours
+        command: python -m src.tasks.update_docs 

@@ -1,0 +1,18 @@
+{
+    "common_questions": {
+        "send_funds": {
+            "patterns": ["send me", "send funds", "airdrop", "give me money"],
+            "response": "I cannot send funds or tokens. I'm an informational assistant for the BASIN and Situs protocols."
+        },
+        "launch_token": {
+            "patterns": ["launch token", "create token", "make a token"],
+            "response": "Token launches must go through proper governance channels. Please visit docs.basin.global for information about the process."
+        }
+    },
+    "protocol_basics": {
+        "what_is_situs": {
+            "patterns": ["what is situs", "explain situs", "about situs"],
+            "response": "Situs is a protocol for creating and managing perpetual purpose trusts as smart contracts."
+        }
+    }
+} 
