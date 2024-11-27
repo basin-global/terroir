@@ -18,7 +18,10 @@ class TerroirAgent:
         self.doc_manager = DocManager(config)
         self.memory_manager = MemoryManager()
         self.command_handler = CommandHandler()
-        self.farcaster = FarcasterHandler(config.NEYNAR_API_KEY)
+        self.farcaster = FarcasterHandler(
+            config.NEYNAR_API_KEY,
+            signer_uuid=config.NEYNAR_SIGNER_UUID
+        )
 
     async def initialize(self):
         """Initialize async components"""
@@ -88,7 +91,7 @@ class TerroirAgent:
         response = await self.process_query(query + "\n\n" + farcaster_prompt)
         await self.farcaster.post_cast(
             content=response,
-            agent_name="TerriorAgent",
+            agent_name="terroir",
             reply_to=reply_to
         )
         return response

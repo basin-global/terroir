@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     NEYNAR_API_KEY: str
     NEYNAR_WEBHOOK_SECRET: str
+    NEYNAR_SIGNER_UUID: str
     
     class Config:
         env_file = ".env"
