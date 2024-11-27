@@ -1,12 +1,13 @@
-from neynar.api import NeynarAPIClient
+import httpx
 from typing import Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
 
 class FarcasterHandler:
     def __init__(self, api_key: str):
-        self.client = NeynarAPIClient(api_key=api_key)
-        self.fid = "885400"  # Terroir Terminal FID
+        self.api_key = api_key
+        self.base_url = "https://api.neynar.com/v2"
+        self.fid = "885400"  # @terroir FID
         
         # Rate limiting
         self.rate_limits = {
@@ -62,27 +63,51 @@ class FarcasterHandler:
             ]
     
     async def post_cast(self, content: str, agent_name: str, 
-                       reply_to: Optional[str] = None,
-                       user_fid: Optional[str] = None) -> dict:
-        """Post a cast with rate limiting"""
-        if not await self.check_rate_limit(user_fid):
-            return {
-                "error": "Rate limit exceeded. Please try again later."
-            }
-            
-        # Record the request
-        now = datetime.now()
-        self.request_history['global'].append(now)
-        if user_fid:
-            self.request_history[user_fid].append(now)
-            
+                       reply_to: Optional[str] = None) -> dict:
+        """Post a cast using Neynar API"""
         formatted_content = await self.format_response(content, agent_name)
         
+        headers = {
+            "accept": "application/json",
+            "api_key": self.api_key,
+            "content-type": "application/json"
+        }
+        
+        data = {
+            "text": formatted_content,
+            "signer_uuid": self.fid  # Your @terroir account
+        }
+        
         if reply_to:
-            return await self.client.cast.create(
-                text=formatted_content,
-                parent_hash=reply_to
+            data["parent"] = reply_to
+            
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/farcaster/cast",
+                headers=headers,
+                json=data
             )
-        return await self.client.cast.create(
-            text=formatted_content
-        )
+            return response.json()
+    
+    async def setup_signer(self):
+        """Setup or verify signer for the Terroir account"""
+        headers = {
+            "accept": "application/json",
+            "api_key": self.api_key,
+            "content-type": "application/json"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            # Get or create signer
+            response = await client.get(
+                f"{self.base_url}/farcaster/user/bulk",
+                headers=headers,
+                params={"fids": self.fid}
+            )
+            user_data = response.json()
+            
+            # Store signer_uuid if available
+            if user_data.get("users"):
+                self.signer_uuid = user_data["users"][0].get("signer_uuid")
+                return self.signer_uuid
+            return None
