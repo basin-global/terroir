@@ -122,13 +122,28 @@ def verify_signature(payload: bytes, signature: str, secret: str) -> bool:
     if not signature:
         return False
     
-    computed = hmac.new(
-        secret.encode(),
-        payload,
-        hashlib.sha256
-    ).hexdigest()
+    # Log for debugging
+    logger.info(f"Verifying signature...")
+    logger.info(f"Payload length: {len(payload)}")
+    logger.info(f"Secret length: {len(secret)}")
     
-    return hmac.compare_digest(computed, signature)
+    try:
+        # Convert webhook secret from hex to bytes if needed
+        secret_bytes = bytes.fromhex(secret) if len(secret) == 64 else secret.encode()
+        
+        computed = hmac.new(
+            secret_bytes,
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+        
+        logger.info(f"Computed signature: {computed}")
+        logger.info(f"Received signature: {signature}")
+        
+        return hmac.compare_digest(computed, signature)
+    except Exception as e:
+        logger.error(f"Error in signature verification: {e}")
+        return False
 
 if __name__ == "__main__":
     if "--dev" in sys.argv:
