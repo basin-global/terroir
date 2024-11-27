@@ -1,11 +1,11 @@
-from farcaster.client import Warpcast
+from neynar.api import NeynarAPIClient
 from typing import Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
 
 class FarcasterHandler:
     def __init__(self, api_key: str):
-        self.client = Warpcast(api_key=api_key)
+        self.client = NeynarAPIClient(api_key=api_key)
         self.fid = "885400"  # Terroir Terminal FID
         
         # Rate limiting
@@ -79,8 +79,10 @@ class FarcasterHandler:
         formatted_content = await self.format_response(content, agent_name)
         
         if reply_to:
-            return await self.client.publish_cast(
+            return await self.client.cast.create(
                 text=formatted_content,
-                reply_to=reply_to
+                parent_hash=reply_to
             )
-        return await self.client.publish_cast(text=formatted_content)
+        return await self.client.cast.create(
+            text=formatted_content
+        )

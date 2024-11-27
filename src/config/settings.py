@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     GITHUB_PERSONAL_ACCESS_TOKEN: str
     USER_AGENT: str
     DATABASE_URL: str
+    NEYNAR_API_KEY: str
     
     class Config:
         env_file = ".env"
