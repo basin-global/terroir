@@ -90,7 +90,8 @@ async def farcaster_webhook(request: Request):
     body = await request.body()
     
     if not verify_signature(body, signature, settings.NEYNAR_WEBHOOK_SECRET):
-        logger.error("Invalid signature")
+        logger.error(f"Invalid signature. Got: {signature}")
+        logger.error(f"Headers: {request.headers}")
         return {"status": "error", "message": "Invalid signature"}, 401
         
     payload = await request.json()
