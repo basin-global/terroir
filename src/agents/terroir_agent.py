@@ -11,6 +11,7 @@ import os
 import asyncpg
 from typing import Dict
 from langchain.schema import Document
+import traceback
 
 class TerroirAgent:
     """Terroir Agent - AI system for managing situs accounts and natural capital"""
@@ -175,14 +176,16 @@ class TerroirAgent:
 
 IMPORTANT:
 - Never make up or fabricate information about BASIN or Situs
-- If you're not sure about something, say so clearly
-- Only use information from the provided documentation
-- It's better to say "I don't know" or "I can't find that in the documentation" than to make assumptions
+- If you find relevant information in the docs, combine it with your general knowledge to provide comprehensive answers
+- When docs mention concepts (like Swiss Re's BES Index), you can explain what they are using your knowledge
+- Clearly distinguish between what's in the docs and what's additional context you're providing
+- It's better to say "While I don't see specific details about X in the docs, I can explain what X is..."
 
 You have access to:
 - Protocol documentation (if relevant to the query)
 - Account data from our database (if relevant)
 - Previous conversations and learned facts
+- Your general knowledge about environmental, financial, and technical concepts
 
 Available Context (use if relevant):
 {doc_context}
@@ -203,36 +206,38 @@ Learned Facts:
         
         return message.content if message and message.content else "I apologize, I need more context to answer that question. Could you provide more details?"
 
-    def _load_protocol_docs(self):
+    def _load_protocol_docs(self, force_refresh: bool = False):
         """Load all protocol documentation at startup"""
-        # Use data directory for both local and Render
         cache_dir = os.path.join(os.path.dirname(self.knowledge_file), 'cache')
         os.makedirs(cache_dir, exist_ok=True)
         cache_file = os.path.join(cache_dir, 'docs_cache.json')
         
-        # Try to load from cache first
-        try:
-            if os.path.exists(cache_file) and os.path.getsize(cache_file) > 0:
-                with open(cache_file, 'r') as f:
-                    cached_data = json.load(f)
-                    print(f"\nLoaded {len(cached_data)} documents from cache")
-                    # Convert cached data back to Document objects
-                    self.documents = [
-                        Document(
-                            page_content=doc['content'],
-                            metadata=doc['metadata']
-                        ) for doc in cached_data
-                    ]
-                    return
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            print(f"Cache not usable, loading from GitHub: {e}")
+        # Only try cache if not forcing refresh
+        if not force_refresh:
+            try:
+                if os.path.exists(cache_file) and os.path.getsize(cache_file) > 0:
+                    with open(cache_file, 'r') as f:
+                        cached_data = json.load(f)
+                        print(f"\nLoaded {len(cached_data)} documents from cache")
+                        self.documents = [
+                            Document(
+                                page_content=doc['content'],
+                                metadata=doc['metadata']
+                            ) for doc in cached_data
+                        ]
+                        return
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                print(f"Cache not usable: {e}")
         
-        # Load from GitHub
-        print("Loading documents from GitHub...")
+        # Load from GitHub (if force_refresh or no cache)
+        print("Loading fresh documents from GitHub...")
         repos = {
             "docs": ["basin-global/situs-docs", "basin-global/BASIN-Field-Manual"],
             "code": ["basin-global/Situs-Protocol"]
         }
+        
+        # Clear existing documents if refreshing
+        self.documents = []
         
         total_docs = 0
         for repo in repos["docs"]:
@@ -244,7 +249,7 @@ Learned Facts:
             total_docs += len(docs)
         
         if total_docs > 0:
-            # Convert documents to serializable format before caching
+            # Convert and cache
             cache_data = [
                 {
                     'content': doc.page_content,
@@ -252,13 +257,12 @@ Learned Facts:
                 } for doc in self.documents
             ]
             
-            # Save to cache
             with open(cache_file, 'w') as f:
                 json.dump(cache_data, f)
             
-            print(f"\nTotal documents loaded and cached: {total_docs}")
+            print(f"\nLoaded and cached {total_docs} fresh documents from GitHub")
         else:
-            print("Warning: No documents were loaded")
+            print("Warning: No documents were loaded from GitHub")
 
     def load_github_docs(self, repo_url: str, branch: str = "main", include_code: bool = False):
         """Load documentation and optionally code from a GitHub repository"""
@@ -271,24 +275,38 @@ Learned Facts:
                 access_token=self.config.GITHUB_PERSONAL_ACCESS_TOKEN,
                 repo=repo_url,
                 branch=branch,
+                recursive=True,
                 file_filter=lambda file_path: any(file_path.endswith(ext) for ext in file_types)
             )
             
             docs = loader.load()
             
-            # Debug loaded docs
-            print(f"\nLoading docs from {repo_url}:")
+            # Debug loaded docs with clear separation
+            print("\n" + "="*50)
+            print(f"Loading docs from {repo_url}:")
+            print(f"Found {len(docs)} documents")
+            print("="*50)
+            
+            # Print all document paths to debug
             for doc in docs:
-                print(f"Source: {doc.metadata.get('source', 'unknown')}")
-                if "swiss" in doc.page_content.lower() or "bes" in doc.page_content.lower():
-                    print(f"Found Swiss Re BES content in: {doc.metadata.get('source')}")
-                    print(f"Preview: {doc.page_content[:200]}...")
+                source = doc.metadata.get('source', 'unknown')
+                print(f"\nLoading: {source}")
+                
+                # Special debug for Swiss Re BES content
+                if any(term in doc.page_content.lower() for term in ['swiss re', 'bes', 'biodiversity']):
+                    print("\n🔍 Found Swiss Re BES content!")
+                    print(f"In file: {source}")
+                    print("-"*30)
+                    print("Content preview:")
+                    print(doc.page_content[:500])
+                    print("-"*30)
             
             self.documents.extend(docs)
             return docs
             
         except Exception as e:
-            print(f"Error loading docs from {repo_url}: {e}")
+            print(f"\n❌ Error loading docs from {repo_url}: {e}")
+            traceback.print_exc()
             return []
 
     def _load_learned_knowledge(self):
@@ -468,63 +486,6 @@ Learned Facts:
             return None
         finally:
             await conn.close()
-
-    def _load_protocol_docs(self, force_refresh: bool = False):
-        """Load all protocol documentation at startup"""
-        # Use data directory for both local and Render
-        cache_dir = os.path.join(os.path.dirname(self.knowledge_file), 'cache')
-        os.makedirs(cache_dir, exist_ok=True)
-        cache_file = os.path.join(cache_dir, 'docs_cache.json')
-        
-        # Try to load from cache first
-        try:
-            if os.path.exists(cache_file) and os.path.getsize(cache_file) > 0:
-                with open(cache_file, 'r') as f:
-                    cached_data = json.load(f)
-                    print(f"\nLoaded {len(cached_data)} documents from cache")
-                    # Convert cached data back to Document objects
-                    self.documents = [
-                        Document(
-                            page_content=doc['content'],
-                            metadata=doc['metadata']
-                        ) for doc in cached_data
-                    ]
-                    return
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            print(f"Cache not usable, loading from GitHub: {e}")
-        
-        # Load from GitHub
-        print("Loading documents from GitHub...")
-        repos = {
-            "docs": ["basin-global/situs-docs", "basin-global/BASIN-Field-Manual"],
-            "code": ["basin-global/Situs-Protocol"]
-        }
-        
-        total_docs = 0
-        for repo in repos["docs"]:
-            docs = self.load_github_docs(repo)
-            total_docs += len(docs)
-        
-        for repo in repos["code"]:
-            docs = self.load_github_docs(repo, include_code=True)
-            total_docs += len(docs)
-        
-        if total_docs > 0:
-            # Convert documents to serializable format before caching
-            cache_data = [
-                {
-                    'content': doc.page_content,
-                    'metadata': doc.metadata
-                } for doc in self.documents
-            ]
-            
-            # Save to cache
-            with open(cache_file, 'w') as f:
-                json.dump(cache_data, f)
-            
-            print(f"\nTotal documents loaded and cached: {total_docs}")
-        else:
-            print("Warning: No documents were loaded")
 
     def _process_todo(self, query: str, response: str, source: dict = None):
         """Process todo commands"""
