@@ -1,7 +1,15 @@
 # Environment
 .env
 venv/
+env/
+.python-version
 __pycache__/
+*.pyc
+
+# Package info
+*.egg-info/
+dist/
+build/
 
 # Data files
 data/*.json
@@ -9,8 +17,23 @@ data/*.json
 
 # Cache
 .cache/
-vector_store/
+__pycache__/
+.pytest_cache/
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+
+# Other data files
+data/cache/*
+!data/cache/.gitkeep
+
+# Node (removing since we're not using)
+node_modules/
+package-lock.json
+package.json
+
+# Logs
+*.log

@@ -1,0 +1,33 @@
+terroir/
+├── src/
+│   ├── agents/
+│   │   ├── base/
+│   │   │   ├── __init__.py
+│   │   │   ├── command_handler.py
+│   │   │   ├── data_manager.py
+│   │   │   ├── doc_manager.py
+│   │   │   └── memory_manager.py
+│   │   ├── __init__.py
+│   │   └── terroir_agent.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── main.py
+│   ├── config/
+│   │   ├── __init__.py
+│   │   ├── settings.py
+│   │   ├── instructions.py
+│   │   └── account_config.py
+│   ├── data/
+│   │   ├── __init__.py
+│   │   ├── cache/
+│   │   │   └── docs_cache.json
+│   │   ├── commands/
+│   │   │   ├── todo_list.json
+│   │   │   └── faq_responses.json
+│   │   └── knowledge/
+│   │       └── learned_knowledge.json
+│   └── __init__.py
+├── .env
+├── setup.py
+├── requirements.txt
+└── render.yaml

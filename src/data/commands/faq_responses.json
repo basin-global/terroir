@@ -1,0 +1,18 @@
+{
+  "common_questions": {
+    "what_is_terroir": {
+      "patterns": ["what is terroir", "explain terroir", "about terroir"],
+      "response": "Terroir is an AI agent for the BASIN and SITUS protocols. It provides access to protocol documentation, account information, and smart contract interaction capabilities."
+    },
+    "what_is_situs": {
+      "patterns": ["what is situs", "explain situs", "about situs"],
+      "response": "Situs is a protocol for creating and managing perpetual purpose trusts as smart contracts. It enables the creation of accounts with specific purposes and governance structures."
+    }
+  },
+  "protocol_basics": {
+    "account_types": {
+      "patterns": ["account types", "types of accounts", "what accounts"],
+      "response": "Situs supports various account types including .basin, .earth, .bioregion, and others. Each type has specific purposes and governance structures."
+    }
+  }
+} 
