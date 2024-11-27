@@ -1,4 +1,4 @@
-from farcaster import Warpcast
+from farcaster.client import Warpcast
 from typing import Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
