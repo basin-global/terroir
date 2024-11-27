@@ -85,10 +85,10 @@ async def farcaster_webhook(request: Request):
     """Handle incoming Farcaster events"""
     logger.info("Received webhook request")
     
-    # Log signature details but don't reject
+    # Verify signature
     signature = request.headers.get("x-neynar-signature")
     body = await request.body()
-    verify_signature(body, signature, settings.NEYNAR_WEBHOOK_SECRET)  # Just log, don't check return value
+    verify_signature(body, signature, settings.NEYNAR_WEBHOOK_SECRET)
     
     payload = await request.json()
     logger.info(f"Webhook payload: {payload}")
@@ -99,17 +99,22 @@ async def farcaster_webhook(request: Request):
         app.agent_initialized = True
         logger.info("Agent initialized")
     
-    # Handle mentions and replies
-    if payload["type"] in ["mention", "reply"]:
-        logger.info(f"Processing mention/reply: {payload['cast']['text']}")
-        try:
-            response = await terroir.process_farcaster_query(
-                query=payload["cast"]["text"],
-                reply_to=payload["cast"]["hash"]
-            )
-            logger.info(f"Response sent: {response}")
-        except Exception as e:
-            logger.error(f"Error processing cast: {e}")
+    # Handle cast.created events
+    if payload.get("type") == "cast.created":
+        cast_data = payload.get("data", {})
+        mentioned_profiles = cast_data.get("mentioned_profiles", [])
+        
+        # Check if @terroir was mentioned
+        if any(profile.get("fid") == 885400 for profile in mentioned_profiles):
+            logger.info(f"Processing mention: {cast_data.get('text')}")
+            try:
+                response = await terroir.process_farcaster_query(
+                    query=cast_data.get("text"),
+                    reply_to=cast_data.get("hash")  # Use the cast hash for reply
+                )
+                logger.info(f"Response sent: {response}")
+            except Exception as e:
+                logger.error(f"Error processing cast: {e}")
     
     return {"status": "success"}
 
