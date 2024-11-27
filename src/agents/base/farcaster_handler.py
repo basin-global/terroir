@@ -1,4 +1,4 @@
-from neynar import NeynarAPIClient
+from neynar.api import NeynarAPIClient
 from typing import Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
