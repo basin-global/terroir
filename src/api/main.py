@@ -10,10 +10,15 @@ from watchdog.events import FileSystemEventHandler
 import time
 import hmac
 import hashlib
+import logging
 
 app = FastAPI()
 settings = Settings()
 terroir = TerroirAgent(settings)
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class CodeChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
@@ -78,27 +83,36 @@ async def root():
 @app.post("/api/farcaster/webhook")
 async def farcaster_webhook(request: Request):
     """Handle incoming Farcaster events"""
+    logger.info("Received webhook request")
+    
     # Verify webhook signature
     signature = request.headers.get("x-neynar-signature")
     body = await request.body()
     
     if not verify_signature(body, signature, settings.NEYNAR_WEBHOOK_SECRET):
+        logger.error("Invalid signature")
         return {"status": "error", "message": "Invalid signature"}, 401
         
     payload = await request.json()
+    logger.info(f"Webhook payload: {payload}")
     
     # Initialize agent if needed
     if not hasattr(app, "agent_initialized"):
         await terroir.initialize()
         app.agent_initialized = True
+        logger.info("Agent initialized")
     
     # Handle mentions and replies
     if payload["type"] in ["mention", "reply"]:
-        cast_content = payload["cast"]["text"]
-        await terroir.process_farcaster_query(
-            query=cast_content,
-            reply_to=payload["cast"]["hash"]
-        )
+        logger.info(f"Processing mention/reply: {payload['cast']['text']}")
+        try:
+            response = await terroir.process_farcaster_query(
+                query=payload["cast"]["text"],
+                reply_to=payload["cast"]["hash"]
+            )
+            logger.info(f"Response sent: {response}")
+        except Exception as e:
+            logger.error(f"Error processing cast: {e}")
     
     return {"status": "success"}
 
