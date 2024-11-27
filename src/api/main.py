@@ -8,6 +8,8 @@ import sys
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import time
+import hmac
+import hashlib
 
 app = FastAPI()
 settings = Settings()
@@ -76,6 +78,13 @@ async def root():
 @app.post("/api/farcaster/webhook")
 async def farcaster_webhook(request: Request):
     """Handle incoming Farcaster events"""
+    # Verify webhook signature
+    signature = request.headers.get("x-neynar-signature")
+    body = await request.body()
+    
+    if not verify_signature(body, signature, settings.NEYNAR_WEBHOOK_SECRET):
+        return {"status": "error", "message": "Invalid signature"}, 401
+        
     payload = await request.json()
     
     # Initialize agent if needed
@@ -92,6 +101,19 @@ async def farcaster_webhook(request: Request):
         )
     
     return {"status": "success"}
+
+def verify_signature(payload: bytes, signature: str, secret: str) -> bool:
+    """Verify Neynar webhook signature"""
+    if not signature:
+        return False
+    
+    computed = hmac.new(
+        secret.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    
+    return hmac.compare_digest(computed, signature)
 
 if __name__ == "__main__":
     if "--dev" in sys.argv:

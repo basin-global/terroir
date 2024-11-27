@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     USER_AGENT: str
     DATABASE_URL: str
     NEYNAR_API_KEY: str
+    NEYNAR_WEBHOOK_SECRET: str
     
     class Config:
         env_file = ".env"
