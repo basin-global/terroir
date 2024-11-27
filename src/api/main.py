@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
 from src.config.settings import Settings
 from src.agents.terroir_agent import TerroirAgent
 import uvicorn
@@ -10,6 +10,8 @@ from watchdog.events import FileSystemEventHandler
 import time
 
 app = FastAPI()
+settings = Settings()
+terroir = TerroirAgent(settings)
 
 class CodeChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
@@ -71,6 +73,26 @@ async def root():
     """Health check endpoint"""
     return {"status": "Terroir is running"}
 
+@app.post("/api/farcaster/webhook")
+async def farcaster_webhook(request: Request):
+    """Handle incoming Farcaster events"""
+    payload = await request.json()
+    
+    # Initialize agent if needed
+    if not hasattr(app, "agent_initialized"):
+        await terroir.initialize()
+        app.agent_initialized = True
+    
+    # Handle mentions and replies
+    if payload["type"] in ["mention", "reply"]:
+        cast_content = payload["cast"]["text"]
+        await terroir.process_farcaster_query(
+            query=cast_content,
+            reply_to=payload["cast"]["hash"]
+        )
+    
+    return {"status": "success"}
+
 if __name__ == "__main__":
     if "--dev" in sys.argv:
         # Run interactive mode with file watching
@@ -84,6 +106,7 @@ if __name__ == "__main__":
             observer.stop()
             observer.join()
     else:
-        # Run API server
+        # Initialize agent before running API server
+        asyncio.run(terroir.initialize())
         port = int(os.getenv("PORT", 8000))
         uvicorn.run(app, host="0.0.0.0", port=port) 

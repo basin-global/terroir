@@ -5,6 +5,8 @@ from src.agents.base.data_manager import DataManager
 from src.agents.base.doc_manager import DocManager
 from src.agents.base.memory_manager import MemoryManager
 from src.agents.base.command_handler import CommandHandler
+from src.agents.base.farcaster_handler import FarcasterHandler
+from typing import Optional
 
 class TerroirAgent:
     def __init__(self, config):
@@ -16,6 +18,7 @@ class TerroirAgent:
         self.doc_manager = DocManager(config)
         self.memory_manager = MemoryManager()
         self.command_handler = CommandHandler()
+        self.farcaster = FarcasterHandler(config.NEYNAR_API_KEY)
 
     async def initialize(self):
         """Initialize async components"""
@@ -75,3 +78,17 @@ class TerroirAgent:
         self.memory_manager.store(query, message.content)
         
         return message.content
+
+    async def process_farcaster_query(self, query: str, reply_to: Optional[str] = None) -> str:
+        """Process query and post response to Farcaster"""
+        # Add Farcaster-specific instruction to system prompt
+        farcaster_prompt = """Please provide a concise response suitable for Farcaster (max 320 chars). 
+        Focus on the most important information while maintaining a helpful tone."""
+        
+        response = await self.process_query(query + "\n\n" + farcaster_prompt)
+        await self.farcaster.post_cast(
+            content=response,
+            agent_name="TerriorAgent",
+            reply_to=reply_to
+        )
+        return response
