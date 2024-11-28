@@ -179,22 +179,32 @@ class FarcasterHandler:
             if any(profile.get("fid") == int(self.fid) for profile in mentioned_profiles):
                 should_respond = True
                 parent_hash = cast_data.get("hash")
-                # Get thread context
-                thread_hash = cast_data.get("thread_hash")
-                if thread_hash:
-                    thread_context = await self.get_thread_context(thread_hash)
                 logger.info("Detected direct @terroir mention")
             
             # Check if this is a reply to one of our casts
-            parent_author = cast_data.get("parent_author", {})
-            if parent_author and parent_author.get("fid") == int(self.fid):
-                should_respond = True
-                parent_hash = cast_data.get("hash")
-                # Get thread context
-                thread_hash = cast_data.get("thread_hash")
-                if thread_hash:
-                    thread_context = await self.get_thread_context(thread_hash)
-                logger.info("Detected reply to our cast")
+            parent_hash_from_data = cast_data.get("parent_hash")
+            thread_hash = cast_data.get("thread_hash")
+            
+            # Get parent cast details to check if it's ours
+            if parent_hash_from_data:
+                try:
+                    headers = {
+                        "accept": "application/json",
+                        "api_key": self.api_key
+                    }
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(
+                            f"{self.base_url}/farcaster/cast/{parent_hash_from_data}",
+                            headers=headers
+                        )
+                        if response.status_code == 200:
+                            parent_data = response.json()
+                            if parent_data.get("cast", {}).get("author", {}).get("fid") == int(self.fid):
+                                should_respond = True
+                                parent_hash = cast_data.get("hash")
+                                logger.info("Detected reply to our cast")
+                except Exception as e:
+                    logger.error(f"Error checking parent cast: {e}")
             
             if should_respond:
                 logger.info(f"Will respond to cast: {cast_data.get('text')}")
