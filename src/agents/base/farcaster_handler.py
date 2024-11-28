@@ -170,6 +170,12 @@ class FarcasterHandler:
         if payload.get("type") == "cast.created":
             cast_data = payload.get("data", {})
             
+            # First check if this is our own cast to prevent loops
+            author = cast_data.get("author", {})
+            if author.get("fid") == int(self.fid):
+                logger.info("Skipping our own cast")
+                return None
+            
             should_respond = False
             parent_hash = None
             thread_context = None
@@ -178,22 +184,15 @@ class FarcasterHandler:
             mentioned_profiles = cast_data.get("mentioned_profiles", [])
             if any(profile.get("fid") == int(self.fid) for profile in mentioned_profiles):
                 should_respond = True
-                parent_hash = cast_data.get("hash")  # Hash of the cast we're replying to
-                logger.info("Detected direct @terroir mention")
+                parent_hash = cast_data.get("hash")  # Hash of the mentioning cast
+                logger.info(f"Detected direct @terroir mention in cast: {parent_hash}")
             
             # Check if this is a reply to our cast
             parent_author = cast_data.get("parent_author", {})
-            parent_hash_from_data = cast_data.get("parent_hash")  # Get the parent hash
             if parent_author and str(parent_author.get("fid")) == self.fid:
                 should_respond = True
-                parent_hash = parent_hash_from_data  # Use the parent hash for replies
-                logger.info(f"Detected reply to our cast with parent hash: {parent_hash}")
-                
-                # Get thread context if available
-                thread_hash = cast_data.get("thread_hash")
-                if thread_hash:
-                    thread_context = await self.get_thread_context(thread_hash)
-                    logger.info(f"Thread context: {thread_context}")
+                parent_hash = cast_data.get("hash")  # Hash of the replying cast
+                logger.info(f"Detected reply to our cast: {parent_hash}")
             
             if should_respond:
                 logger.info(f"Will respond to cast: {cast_data.get('text')}")
