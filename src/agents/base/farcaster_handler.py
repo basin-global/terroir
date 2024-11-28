@@ -172,28 +172,58 @@ class FarcasterHandler:
             
             should_respond = False
             parent_hash = None
+            thread_context = None
             
-            # Check for direct mentions
-            text = cast_data.get("text", "").lower()
-            if "@terroir" in text:
+            # Check for direct mentions in mentioned_profiles
+            mentioned_profiles = cast_data.get("mentioned_profiles", [])
+            if any(profile.get("fid") == int(self.fid) for profile in mentioned_profiles):
                 should_respond = True
                 parent_hash = cast_data.get("hash")
+                # Get thread context
+                thread_hash = cast_data.get("thread_hash")
+                if thread_hash:
+                    thread_context = await self.get_thread_context(thread_hash)
                 logger.info("Detected direct @terroir mention")
-                
+            
             # Check if this is a reply to one of our casts
             parent_author = cast_data.get("parent_author", {})
-            if parent_author and parent_author.get("fid") == self.fid:
+            if parent_author and parent_author.get("fid") == int(self.fid):
                 should_respond = True
                 parent_hash = cast_data.get("hash")
+                # Get thread context
+                thread_hash = cast_data.get("thread_hash")
+                if thread_hash:
+                    thread_context = await self.get_thread_context(thread_hash)
                 logger.info("Detected reply to our cast")
-                
-            return {
-                "should_respond": should_respond,
-                "parent_hash": parent_hash,
-                "text": cast_data.get("text")
-            }
+            
+            if should_respond:
+                logger.info(f"Will respond to cast: {cast_data.get('text')}")
+                return {
+                    "should_respond": True,
+                    "parent_hash": parent_hash,
+                    "text": cast_data.get("text"),
+                    "thread_context": thread_context
+                }
         
         return None
+    
+    async def get_thread_context(self, thread_hash: str) -> str:
+        """Get previous messages in thread"""
+        headers = {
+            "accept": "application/json",
+            "api_key": self.api_key
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/farcaster/cast/{thread_hash}",
+                headers=headers
+            )
+            if response.status_code == 200:
+                thread_data = response.json()
+                # Extract relevant context
+                return thread_data.get("text", "")
+            return ""
     
     async def verify_webhook_signature(self, body: bytes, signature: str, secret: str) -> bool:
         """Verify Neynar webhook signature"""
