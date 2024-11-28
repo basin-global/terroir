@@ -12,11 +12,12 @@ from fastapi import Request
 logger = logging.getLogger(__name__)
 
 class FarcasterHandler:
-    def __init__(self, api_key: str, signer_uuid: str = None):
+    def __init__(self, api_key: str, signer_uuid: str = None, webhook_secret: str = None):
         self.api_key = api_key
         self.base_url = "https://api.neynar.com/v2"
         self.fid = "885400"  # @terroir FID
-        self.signer_uuid = signer_uuid  # Use provided signer_uuid
+        self.signer_uuid = signer_uuid
+        self.webhook_secret = webhook_secret  # Store webhook_secret
         
         # Rate limiting
         self.rate_limits = {

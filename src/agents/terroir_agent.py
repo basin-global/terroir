@@ -22,8 +22,9 @@ class TerroirAgent:
         self.memory_manager = MemoryManager()
         self.command_handler = CommandHandler()
         self.farcaster = FarcasterHandler(
-            config.NEYNAR_API_KEY,
-            signer_uuid=config.NEYNAR_SIGNER_UUID
+            api_key=config.NEYNAR_API_KEY,
+            signer_uuid=config.NEYNAR_SIGNER_UUID,
+            webhook_secret=config.NEYNAR_WEBHOOK_SECRET
         )
 
     async def initialize(self):
