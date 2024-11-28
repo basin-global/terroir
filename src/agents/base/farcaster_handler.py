@@ -79,22 +79,17 @@ class FarcasterHandler:
             "content-type": "application/json"
         }
         
-        # First ensure we have a signer
-        if not hasattr(self, 'signer_uuid'):
-            await self.setup_signer()
-            
-        if not self.signer_uuid:
-            logger.error("No signer_uuid available")
-            return {"error": "No signer available"}
-        
         data = {
             "text": formatted_content,
-            "signer_uuid": self.signer_uuid  # Use signer_uuid instead of fid
+            "signer_uuid": self.signer_uuid
         }
         
         if reply_to:
-            data["parent_hash"] = reply_to
-            
+            # Remove '0x' prefix if present for Neynar API
+            reply_to = reply_to.replace('0x', '')
+            data["parent_hash"] = reply_to  # This makes it a reply
+            logger.info(f"Replying to cast: {reply_to}")
+        
         logger.info(f"Sending cast data: {data}")
             
         async with httpx.AsyncClient() as client:

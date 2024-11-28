@@ -4,6 +4,9 @@ import os
 from dotenv import load_dotenv
 import json
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DataManager:
     def __init__(self):
@@ -146,55 +149,36 @@ class DataManager:
         return self.accounts_cache.get(full_name)
 
     async def get_relevant(self, query: str) -> str:
-        """Get relevant account data based on query"""
-        await self._check_cache()
+        """Get relevant data from database based on query"""
+        logger.info(f"Getting relevant data for query: {query}")
         
-        # Check if query is asking about an address/wallet
-        address_keywords = ["address", "wallet", "0x", "tba"]
-        is_address_query = any(word in query.lower() for word in address_keywords)
-        
-        # First check for full account name (name.og)
-        if '.' in query:
-            account_data = self.accounts_cache["by_full_name"].get(query.lower())
-            if account_data:
-                if is_address_query and 'tba_address' in account_data:
-                    return f"\nTBA: {account_data['tba_address']}"
+        # Check if query is about a wallet/TBA
+        if any(word in query.lower() for word in ['wallet', 'tba', 'address']):
+            # First check cache
+            await self._check_cache()
+            
+            # Extract potential account name (e.g., "elk.basin" from query)
+            words = query.lower().split()
+            for word in words:
+                # Check full name (e.g., "elk.basin")
+                if word in self.accounts_cache["by_full_name"]:
+                    account = self.accounts_cache["by_full_name"][word]
+                    return f"Account {word} has TBA address {account.get('tba_address')}"
                 
-                # Return just the essential account info without speculation
-                response = []
-                response.append(f"Account: {query}")
-                if 'token_id' in account_data:
-                    response.append(f"Token ID: {account_data['token_id']}")
-                if 'tba_address' in account_data:
-                    response.append(f"TBA: {account_data['tba_address']}")
-                if 'description' in account_data and account_data['description']:
-                    response.append(f"Description: {account_data['description']}")
-                return "\n".join(response)
-        
-        # Then check for partial name matches
-        words = query.lower().split()
-        for word in words:
-            if word in self.accounts_cache["by_name"]:
-                accounts = self.accounts_cache["by_name"][word]
-                if len(accounts) == 1:
-                    # Single account found
-                    account = accounts[0]
-                    if is_address_query and 'tba_address' in account:
-                        return f"\nTBA: {account['tba_address']}"
-                    
-                    # Return just the essential account info
-                    response = []
-                    response.append(f"Account: {word}.{account['og']}")
-                    if 'token_id' in account:
-                        response.append(f"Token ID: {account['token_id']}")
-                    if 'tba_address' in account:
-                        response.append(f"TBA: {account['tba_address']}")
-                    if 'description' in account and account['description']:
-                        response.append(f"Description: {account['description']}")
-                    return "\n".join(response)
-                else:
-                    # Multiple accounts found
-                    return "\nFound accounts:\n" + \
-                           "\n".join([f"- {word}.{a['og']} (ID: {a['token_id']}, TBA: {a['tba_address']})" for a in accounts])
-
+                # Check name without OG (e.g., "elk")
+                if word in self.accounts_cache["by_name"]:
+                    accounts = self.accounts_cache["by_name"][word]
+                    # Return all matching accounts
+                    responses = []
+                    for acc in accounts:
+                        og = acc["og"]
+                        full_name = f"{word}.{og}"
+                        tba = acc.get("tba_address")
+                        if tba:
+                            responses.append(f"{full_name} has TBA address {tba}")
+                    if responses:
+                        return "\n".join(responses)
+            
+            logger.info("No matching account found in cache")
+            
         return ""

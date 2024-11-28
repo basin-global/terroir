@@ -11,6 +11,7 @@ import time
 import hmac
 import hashlib
 import logging
+from datetime import datetime, timedelta
 
 app = FastAPI()
 settings = Settings()
@@ -38,7 +39,11 @@ async def interactive_loop(agent, observer=None):
     """CLI interface for local development"""
     print("\nTerroir Agent Interactive Mode")
     print("Type 'exit' to quit")
+    print("Type '/cast your message' to post to Farcaster")
+    print("Type '/cast+N your message' to schedule a cast in N hours")
     print("--------------------------------")
+    
+    scheduled_casts = []  # Store scheduled casts
     
     while True:
         try:
@@ -49,10 +54,50 @@ async def interactive_loop(agent, observer=None):
                     observer.stop()
                 print("Shutting down Terroir Agent...")
                 break
-                
-            if user_input:
+            
+            if user_input.startswith('/cast+'):
+                # Parse schedule time
+                try:
+                    parts = user_input.split(' ', 1)
+                    hours = int(parts[0].replace('/cast+', ''))
+                    message = parts[1].strip()
+                    
+                    # Calculate scheduled time
+                    schedule_time = datetime.now() + timedelta(hours=hours)
+                    
+                    # Store scheduled cast
+                    scheduled_casts.append({
+                        'time': schedule_time,
+                        'message': message
+                    })
+                    print(f"\nScheduled cast for {schedule_time}: {message}")
+                    
+                except Exception as e:
+                    print(f"\nError scheduling cast: {e}")
+                    
+            elif user_input.startswith('/cast '):
+                # Extract message after /cast command
+                message = user_input[6:].strip()
+                response = await agent.process_farcaster_query(message)
+                print(f"\nPosted to Farcaster: {response}")
+            elif user_input:
                 response = await agent.process_query(user_input)
                 print(f"\nTerroir: {response}")
+            
+            # Check and execute scheduled casts
+            now = datetime.now()
+            pending_casts = []
+            for cast in scheduled_casts:
+                if now >= cast['time']:
+                    print(f"\nExecuting scheduled cast: {cast['message']}")
+                    try:
+                        response = await agent.process_farcaster_query(cast['message'])
+                        print(f"Posted scheduled cast: {response}")
+                    except Exception as e:
+                        print(f"Error posting scheduled cast: {e}")
+                else:
+                    pending_casts.append(cast)
+            scheduled_casts = pending_casts
                 
         except KeyboardInterrupt:
             if observer:
@@ -99,18 +144,27 @@ async def farcaster_webhook(request: Request):
         app.agent_initialized = True
         logger.info("Agent initialized")
     
-    # Handle cast.created events
     if payload.get("type") == "cast.created":
         cast_data = payload.get("data", {})
-        mentioned_profiles = cast_data.get("mentioned_profiles", [])
         
-        # Check if @terroir was mentioned
+        should_respond = False
+        
+        # Check for direct mentions
+        mentioned_profiles = cast_data.get("mentioned_profiles", [])
         if any(profile.get("fid") == 885400 for profile in mentioned_profiles):
-            logger.info(f"Processing mention: {cast_data.get('text')}")
+            should_respond = True
+            
+        # Check if this is a reply to one of our casts
+        parent_author = cast_data.get("parent_author", {})
+        if parent_author.get("fid") == 885400:  # If parent cast is from @terroir
+            should_respond = True
+            
+        if should_respond:
+            logger.info(f"Processing cast: {cast_data.get('text')}")
             try:
                 response = await terroir.process_farcaster_query(
                     query=cast_data.get("text"),
-                    reply_to=cast_data.get("hash")  # Use the cast hash for reply
+                    reply_to=cast_data.get("hash")
                 )
                 logger.info(f"Response sent: {response}")
             except Exception as e:
