@@ -62,12 +62,16 @@ class CommandHandler:
             
     def process(self, query: str) -> str:
         """Process commands like todo, faq, etc"""
-        # Check FAQ commands first
+        # Let FarcasterHandler handle cast commands
+        if "cast:" in query.lower() or ("cast+" in query.lower() and ":" in query.lower()):
+            return None  # Let TerriorAgent handle it via FarcasterHandler
+            
+        # Check FAQ commands
         faq_response = self._process_faq_command(query)
         if faq_response:
             return faq_response
             
-        # Then check todo commands
+        # Check todo commands
         todo_response = self._process_todo(query)
         if todo_response:
             return todo_response

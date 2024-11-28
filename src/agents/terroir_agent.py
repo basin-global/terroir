@@ -7,6 +7,9 @@ from src.agents.base.memory_manager import MemoryManager
 from src.agents.base.command_handler import CommandHandler
 from src.agents.base.farcaster_handler import FarcasterHandler
 from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TerroirAgent:
     def __init__(self, config):
@@ -38,7 +41,30 @@ class TerroirAgent:
     async def process_query(self, query: str) -> str:
         # Process any commands first
         command_response = self.command_handler.process(query)
-        if command_response:
+        logger.info(f"Command response: {command_response}")
+        
+        # If command_handler returns None, check if it's a cast command
+        if command_response is None and ("cast:" in query.lower() or "cast+" in query.lower()):
+            logger.info("Checking FarcasterHandler for cast command")
+            cast_response = await self.farcaster.process_cast_command(query)
+            if cast_response:
+                logger.info(f"Cast command detected: {cast_response}")
+                if cast_response["type"] == "cast":
+                    if cast_response.get("raw"):
+                        logger.info("Processing raw cast")
+                        # Just post the raw message directly
+                        await self.farcaster.post_cast(
+                            content=cast_response["message"],
+                            agent_name="terroir"
+                        )
+                        return cast_response["message"]
+                    else:
+                        return await self.process_farcaster_query(
+                            query=cast_response["message"]
+                        )
+                elif cast_response["type"] == "scheduled_cast":
+                    return f"Scheduled cast for {cast_response['hours']} hours from now: {cast_response['message']}"
+        elif command_response:
             return command_response
 
         # Gather all available context
@@ -82,30 +108,20 @@ class TerroirAgent:
         
         return message.content
 
-    async def process_farcaster_query(self, query: str, reply_to: Optional[str] = None) -> str:
+    async def process_farcaster_query(self, query: str, reply_to: Optional[str] = None, raw: bool = False) -> str:
         """Process query and post response to Farcaster"""
-        # Get conversation context
+        if raw:
+            # Skip Claude processing, post exactly as written
+            await self.farcaster.post_cast(
+                content=query,
+                agent_name="terroir",
+                reply_to=reply_to
+            )
+            return query
+            
+        # Regular processing for non-raw casts...
         memory_context = self.memory_manager.get_context()
-        
-        # Add Farcaster-specific instruction to system prompt
-        farcaster_prompt = f"""
-        Previous conversation:
-        {memory_context}
-        
-        Provide a direct response suitable for Farcaster (max 320 chars).
-        Do not include any preamble.
-        Maintain conversation continuity and context.
-        
-        If the query is technical (about addresses, protocols, etc):
-        - Be precise and use technical terms
-        - Include relevant data points
-        
-        If the query is casual/curious:
-        - Be engaging and approachable
-        - Use analogies when helpful
-        - Encourage further questions
-        """
-        
+        farcaster_prompt = await self.farcaster.get_prompt(query, memory_context, reply_to)
         response = await self.process_query(query + "\n\n" + farcaster_prompt)
         await self.farcaster.post_cast(
             content=response,

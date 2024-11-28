@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import logging
 import asyncio
+import hmac
+import hashlib
+from fastapi import Request
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -160,3 +163,154 @@ class FarcasterHandler:
                 
             logger.error("Failed to get or create signer")
             return None
+    
+    async def handle_webhook_event(self, payload: dict) -> Optional[dict]:
+        """Handle incoming Farcaster webhook events"""
+        if payload.get("type") == "cast.created":
+            cast_data = payload.get("data", {})
+            
+            should_respond = False
+            parent_hash = None
+            
+            # Check for direct mentions
+            text = cast_data.get("text", "").lower()
+            if "@terroir" in text:
+                should_respond = True
+                parent_hash = cast_data.get("hash")
+                logger.info("Detected direct @terroir mention")
+                
+            # Check if this is a reply to one of our casts
+            parent_author = cast_data.get("parent_author", {})
+            if parent_author and parent_author.get("fid") == self.fid:
+                should_respond = True
+                parent_hash = cast_data.get("hash")
+                logger.info("Detected reply to our cast")
+                
+            return {
+                "should_respond": should_respond,
+                "parent_hash": parent_hash,
+                "text": cast_data.get("text")
+            }
+        
+        return None
+    
+    async def verify_webhook_signature(self, body: bytes, signature: str, secret: str) -> bool:
+        """Verify Neynar webhook signature"""
+        if not signature:
+            return False
+        
+        logger.info("Verifying webhook signature...")
+        try:
+            computed = hmac.new(
+                secret.encode('utf-8'),
+                body,
+                hashlib.sha512
+            ).hexdigest()
+            
+            logger.info(f"Computed signature: {computed}")
+            logger.info(f"Received signature: {signature}")
+            
+            return hmac.compare_digest(computed, signature)
+        except Exception as e:
+            logger.error(f"Error in signature verification: {e}")
+            return False
+
+    async def process_webhook(self, request: Request, agent) -> dict:
+        """Process incoming webhook request"""
+        # Verify signature
+        signature = request.headers.get("x-neynar-signature")
+        body = await request.body()
+        
+        if not await self.verify_webhook_signature(body, signature, self.webhook_secret):
+            logger.error("Invalid webhook signature")
+            return {"status": "error", "message": "Invalid signature"}
+            
+        payload = await request.json()
+        logger.info(f"Webhook payload: {payload}")
+        
+        # Process the event
+        event_data = await self.handle_webhook_event(payload)
+        
+        if event_data and event_data["should_respond"]:
+            try:
+                response = await agent.process_farcaster_query(
+                    query=event_data["text"],
+                    reply_to=event_data["parent_hash"]
+                )
+                logger.info(f"Response sent: {response}")
+            except Exception as e:
+                logger.error(f"Error processing cast: {e}")
+                
+        return {"status": "success"}
+    
+    async def process_cast_command(self, query: str) -> dict:
+        """Process cast commands from CLI"""
+        if "cast+raw:" in query.lower():
+            # Extract message and send exactly as written
+            message = query.split(":", 1)[1].strip()
+            return {
+                "type": "cast",
+                "message": message,
+                "raw": True  # Flag to skip Claude processing
+            }
+            
+        elif "cast:" in query.lower():
+            # Regular cast - will be processed by Claude
+            message = query.split("cast:")[1].strip()
+            return {
+                "type": "cast",
+                "message": message,
+                "raw": False
+            }
+            
+        # Scheduled cast handling stays the same...
+        elif "cast+" in query.lower() and ":" in query.lower():
+            try:
+                command, message = query.split(":", 1)
+                hours = int(command.replace("cast+", "").strip())
+                
+                return {
+                    "type": "scheduled_cast",
+                    "hours": hours,
+                    "message": message.strip()
+                }
+            except Exception as e:
+                return f"Error parsing scheduled cast: {e}"
+                
+        return None
+    
+    async def get_prompt(self, query: str, memory_context: str, reply_to: Optional[str] = None) -> str:
+        """Get appropriate prompt based on cast type"""
+        if reply_to:
+            # This is a reply - be conversational
+            return f"""
+            Previous conversation:
+            {memory_context}
+            
+            Provide a direct response suitable for Farcaster (max 320 chars).
+            This is a reply to someone's question or comment.
+            - Be conversational and engaging
+            - Address their points directly
+            - Encourage further discussion
+            - Maintain context of the thread
+            """
+        else:
+            # This is a new cast - be more declarative and match tone
+            return """
+            Provide a clear statement suitable for Farcaster (max 320 chars).
+            This is a new cast, not a reply.
+            
+            Important:
+            - Match the emotional tone of the input
+            - If the input is passionate/urgent, reflect that energy
+            - If the input is critical, be equally direct
+            - If mentioning $ENSURE or BASIN, be enthusiastic
+            - Use strong, impactful language when appropriate
+            - Keep the focus on environmental and natural capital issues
+            
+            Style:
+            - Make clear, declarative statements
+            - Focus on facts and insights
+            - Be bold and authentic
+            - Don't use phrases like "let me explain" or "I can provide"
+            """
