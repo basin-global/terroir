@@ -34,14 +34,21 @@ class FarcasterHandler:
         
     async def format_response(self, response: str, agent_name: str) -> str:
         """Format response with agent attribution for Farcaster"""
-        max_length = 320
+        max_cast_length = 320  # Farcaster's limit
         signature = f"\n\n/s/ {agent_name}"
-        content_limit = max_length - len(signature)
+        signature_length = len(signature)
+        content_limit = max_cast_length - signature_length
         
+        # Truncate content if needed, ensuring room for ellipsis and signature
         if len(response) > content_limit:
-            response = response[:content_limit-3] + "..."
-            
-        return response + signature
+            truncated_limit = content_limit - 3  # Leave room for "..."
+            response = response[:truncated_limit] + "..."
+            logger.info(f"Truncated response from {len(response)} to {truncated_limit} chars")
+        
+        final_cast = response + signature
+        logger.info(f"Final cast length: {len(final_cast)} chars")
+        
+        return final_cast
     
     async def check_rate_limit(self, user_fid: str = None) -> bool:
         """Check if request is within rate limits"""
@@ -91,7 +98,7 @@ class FarcasterHandler:
         if reply_to:
             # Remove '0x' prefix if present for Neynar API
             reply_to = reply_to.replace('0x', '')
-            data["parent_hash"] = reply_to  # This makes it a reply
+            data["parent"] = reply_to  # Changed from parent_hash to parent
             logger.info(f"Replying to cast: {reply_to}")
         
         logger.info(f"Sending cast data: {data}")
@@ -178,7 +185,6 @@ class FarcasterHandler:
             
             should_respond = False
             parent_hash = None
-            thread_context = None
             
             # Check for direct mentions
             mentioned_profiles = cast_data.get("mentioned_profiles", [])
@@ -198,9 +204,8 @@ class FarcasterHandler:
                 logger.info(f"Will respond to cast: {cast_data.get('text')}")
                 return {
                     "should_respond": True,
-                    "parent_hash": parent_hash,
-                    "text": cast_data.get("text"),
-                    "thread_context": thread_context
+                    "parent_hash": parent_hash,  # This will be used as the parent parameter
+                    "text": cast_data.get("text")
                 }
         
         return None
