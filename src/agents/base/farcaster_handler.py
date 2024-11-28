@@ -85,14 +85,14 @@ class FarcasterHandler:
         
         data = {
             "text": formatted_content,
-            "signer_uuid": self.signer_uuid
+            "signer_uuid": self.signer_uuid,
+            "embeds": []  # Required by API
         }
         
         if reply_to:
-            # Remove '0x' prefix if present for Neynar API
-            reply_to = reply_to.replace('0x', '')
-            data["parent_hash"] = reply_to  # This makes it a reply
-            logger.info(f"Replying to cast: {reply_to}")
+            # Keep the full hash for parent parameter
+            data["parent"] = reply_to  # Changed from parent_hash to parent per API docs
+            logger.info(f"Replying to cast with parent: {reply_to}")
         
         logger.info(f"Sending cast data: {data}")
             
