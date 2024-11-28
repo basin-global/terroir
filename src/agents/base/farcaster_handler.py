@@ -178,15 +178,16 @@ class FarcasterHandler:
             mentioned_profiles = cast_data.get("mentioned_profiles", [])
             if any(profile.get("fid") == int(self.fid) for profile in mentioned_profiles):
                 should_respond = True
-                parent_hash = cast_data.get("hash")
+                parent_hash = cast_data.get("hash")  # Hash of the cast we're replying to
                 logger.info("Detected direct @terroir mention")
             
             # Check if this is a reply to our cast
             parent_author = cast_data.get("parent_author", {})
+            parent_hash_from_data = cast_data.get("parent_hash")  # Get the parent hash
             if parent_author and str(parent_author.get("fid")) == self.fid:
                 should_respond = True
-                parent_hash = cast_data.get("hash")
-                logger.info("Detected reply to our cast")
+                parent_hash = parent_hash_from_data  # Use the parent hash for replies
+                logger.info(f"Detected reply to our cast with parent hash: {parent_hash}")
                 
                 # Get thread context if available
                 thread_hash = cast_data.get("thread_hash")
