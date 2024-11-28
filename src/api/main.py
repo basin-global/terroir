@@ -156,8 +156,9 @@ async def farcaster_webhook(request: Request):
             
         # Check if this is a reply to one of our casts
         parent_author = cast_data.get("parent_author", {})
-        if parent_author.get("fid") == 885400:  # If parent cast is from @terroir
+        if parent_author and parent_author.get("fid") == 885400:  # If parent cast is from @terroir
             should_respond = True
+            logger.info("Detected reply to our cast")
             
         if should_respond:
             logger.info(f"Processing cast: {cast_data.get('text')}")

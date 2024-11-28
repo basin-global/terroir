@@ -84,9 +84,27 @@ class TerroirAgent:
 
     async def process_farcaster_query(self, query: str, reply_to: Optional[str] = None) -> str:
         """Process query and post response to Farcaster"""
+        # Get conversation context
+        memory_context = self.memory_manager.get_context()
+        
         # Add Farcaster-specific instruction to system prompt
-        farcaster_prompt = """Please provide a concise response suitable for Farcaster (max 320 chars). 
-        Focus on the most important information while maintaining a helpful tone."""
+        farcaster_prompt = f"""
+        Previous conversation:
+        {memory_context}
+        
+        Provide a direct response suitable for Farcaster (max 320 chars).
+        Do not include any preamble.
+        Maintain conversation continuity and context.
+        
+        If the query is technical (about addresses, protocols, etc):
+        - Be precise and use technical terms
+        - Include relevant data points
+        
+        If the query is casual/curious:
+        - Be engaging and approachable
+        - Use analogies when helpful
+        - Encourage further questions
+        """
         
         response = await self.process_query(query + "\n\n" + farcaster_prompt)
         await self.farcaster.post_cast(
