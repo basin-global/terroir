@@ -92,35 +92,25 @@ class FarcasterHandler:
         
         data = {
             "text": formatted_content,
-            "signer_uuid": self.signer_uuid,
-            "embeds": []  # Optional embeds array
+            "signer_uuid": self.signer_uuid
         }
         
         if reply_to:
-            # Keep the 0x prefix - Neynar API expects the full hash
-            data["parent"] = reply_to  # Use 'parent' instead of 'parent_hash'
-            logger.info(f"Replying to cast with parent: {reply_to}")
+            # Remove '0x' prefix if present for Neynar API
+            reply_to = reply_to.replace('0x', '')
+            data["parent"] = reply_to  # Changed from parent_hash to parent
+            logger.info(f"Replying to cast: {reply_to}")
         
         logger.info(f"Sending cast data: {data}")
             
         async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    f"{self.base_url}/farcaster/cast",
-                    headers=headers,
-                    json=data
-                )
-                response_data = response.json()
-                logger.info(f"Cast response: {response_data}")
-                
-                if response.status_code != 200:
-                    logger.error(f"Error posting cast: {response_data}")
-                    
-                return response_data
-                
-            except Exception as e:
-                logger.error(f"Exception posting cast: {e}")
-                return {"error": str(e)}
+            response = await client.post(
+                f"{self.base_url}/farcaster/cast",
+                headers=headers,
+                json=data
+            )
+            logger.info(f"Cast response: {response.text}")
+            return response.json()
     
     async def setup_signer(self):
         """Setup or verify signer for the Terroir account"""

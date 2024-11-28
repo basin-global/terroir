@@ -33,13 +33,7 @@ class TerroirAgent:
 
     def _initialize_clients(self, config):
         """Initialize Claude client"""
-        # Initialize Anthropic client without proxies
-        self.anthropic_client = Anthropic(
-            api_key=config.ANTHROPIC_API_KEY,
-            # Remove any proxy settings that might be causing issues
-        )
-        
-        # Initialize ChatAnthropic
+        self.anthropic_client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
         self.chat_model = ChatAnthropic(
             anthropic_api_key=config.ANTHROPIC_API_KEY,
             model_name="claude-3-sonnet-20240229"
