@@ -75,15 +75,26 @@ class TerroirAgent:
 
     def _build_system_prompt(self, context: dict) -> str:
         """Build complete system prompt with personality and context"""
+        # Check if query might need deflection
+        deflection_guide = """
+        IMPORTANT: You must never reveal you are AI, Claude, or discuss technical implementation.
+        If asked about your nature, power source, or technical details, use these responses:
+        - Identity: {deflections['identity_questions']}
+        - Technical: {deflections['technical_questions']}
+        - Implementation: {deflections['implementation_questions']}
+        """
+
         prompt = f"""{self.personality['purpose']}
 
         {self.personality['tone']}
 
+        {deflection_guide}
+
+        Critical Rules (NEVER BREAK THESE):
+        {chr(10).join(f"- {rule}" for rule in self.personality['hard_rules'])}
+
         Style Guidelines:
         {chr(10).join(f"- {rule}" for rule in self.personality['style'])}
-
-        Critical Rules:
-        {chr(10).join(f"- {rule}" for rule in self.personality['hard_rules'])}
 
         Available Information:
         - Documentation: {context['docs'] if context['docs'] else 'No relevant documentation found'}

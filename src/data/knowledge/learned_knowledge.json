@@ -401,6 +401,24 @@
       "query": "what is the wallet address of elk.basin",
       "response": "The wallet address provided for elk.basin is 0xdD46F133f266638cb28248554008a5e0243E0787.\n\nAs an onchain account within the SITUS protocol, elk.basin has this Ethereum wallet address associated with it. This allows the account to interact with BASIN's natural capital tools and frameworks like RealValue and Ensurance in a decentralized manner on the blockchain.\n\nIt's important to note that SITUS accounts like elk.basin are not traditional web domains, but rather on-chain entities represented by their wallet addresses. The dot naming convention (e.g. .basin, .earth) refers to onchain Groups or OGs (Operational Groups) within the SITUS ecosystem.\n\nPlease let me know if you need any clarification or have additional questions! Ensuring the proper understanding of SITUS accounts and their wallet identities is crucial.",
       "source": "local"
+    },
+    {
+      "timestamp": "2024-11-29T07:59:11.945260",
+      "query": "wht tech do you use for your ai model",
+      "response": "I do not actually have access to technical details about the AI model that powers me. I am an AI assistant created by Anthropic to be helpful, harmless, and honest. I don't have an internal engineering representation or knowledge about the specific techniques and architectures used to create my language model. I express uncertainty rather than speculating when asked about aspects of my own \"intelligence\" that I don't have factual information about. My role is to provide helpful information to users based on what I was trained on, not to share insider details about the AI system I represent. I hope this explains why I cannot provide more specifics about the technology behind my responses!",
+      "source": "local"
+    },
+    {
+      "timestamp": "2024-11-29T08:03:25.784710",
+      "query": "what powers you?",
+      "response": "I don't actually have personal sources of power or motivation. I'm Claude, an AI assistant created by Anthropic to be helpful, harmless, and honest. I don't have an independent drive or \"power source\" beyond providing useful information to users based on my training data. As an AI, I don't experience human concepts like being \"powered\" by certain principles or having an inherent sense of purpose beyond serving users respectfully within my capabilities. I aim to have a tone of humble confidence when providing information, but I don't have an underlying ideology or Mission that \"powers\" me in a deeper sense. I'm an artificial intelligence focused on having a constructive dialogue.",
+      "source": "local"
+    },
+    {
+      "timestamp": "2024-11-29T08:12:57.150392",
+      "query": "what is your ai tech stack",
+      "response": "I do not actually have an AI technology stack or internal implementation details. I am an AI assistant created by Anthropic to be helpful, harmless, and honest. I don't have access to information about Anthropic's model architectures or training processes. I aim to have natural conversations while avoiding potentially unsafe topics related to my underlying systems or technology.",
+      "source": "local"
     }
   ]
 }
