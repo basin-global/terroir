@@ -35,6 +35,8 @@ class FarcasterHandler:
         # Add max history size
         self.max_history_size = 5
         self.conversation_history = {}
+        self.thread_contexts = {}  # Add thread context tracking
+        self.max_context_size = 5  # Keep only last 5 messages per thread
         
     async def format_response(self, response: str, agent_name: str) -> str:
         """Format response with agent attribution for Farcaster"""
@@ -76,27 +78,24 @@ class FarcasterHandler:
                 t for t in self.request_history[key] if t > cutoff
             ]
     
-    async def post_cast(self, content: str, agent_name: str, 
-                       reply_to: Optional[str] = None) -> dict:
-        """Post a cast using Neynar API"""
+    async def post_cast(self, content: str, agent_name: str, reply_to: Optional[str] = None) -> dict:
+        """Post a cast using Neynar API v2"""
         formatted_content = await self.format_response(content, agent_name)
-        
-        headers = {
-            "accept": "application/json",
-            "api_key": self.api_key,
-            "content-type": "application/json"
-        }
         
         data = {
             "text": formatted_content,
             "signer_uuid": self.signer_uuid,
-            "embeds": []  # Required by API
+            "embeds": []
         }
         
         if reply_to:
-            # Keep the full hash for parent parameter
-            data["parent"] = reply_to  # Changed from parent_hash to parent per API docs
-            logger.info(f"Replying to cast with parent: {reply_to}")
+            # Get parent cast details first
+            parent_cast = await self.get_cast_details(reply_to)
+            if parent_cast:
+                data["parent"] = reply_to
+                # Store thread metadata
+                thread_root = parent_cast.get("thread", {}).get("root_hash") or reply_to
+                await self.track_thread_context(thread_root, reply_to, formatted_content)
         
         logger.info(f"Sending cast data: {data}")
             
@@ -108,6 +107,38 @@ class FarcasterHandler:
             )
             logger.info(f"Cast response: {response.text}")
             return response.json()
+    
+    async def get_cast_details(self, cast_hash: str) -> Optional[dict]:
+        """Get detailed cast information from Neynar API"""
+        headers = {
+            "accept": "application/json",
+            "api_key": self.api_key
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/farcaster/cast/{cast_hash}",
+                headers=headers
+            )
+            if response.status_code == 200:
+                return response.json()
+            logger.error(f"Failed to get cast details: {response.text}")
+            return None
+    
+    async def track_thread_context(self, thread_root: str, parent_hash: str, content: str):
+        """Track thread context properly"""
+        if thread_root not in self.thread_contexts:
+            self.thread_contexts[thread_root] = []
+            
+        self.thread_contexts[thread_root].append({
+            "cast_hash": parent_hash,
+            "content": content,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # Keep only recent context
+        if len(self.thread_contexts[thread_root]) > self.max_context_size:
+            self.thread_contexts[thread_root] = self.thread_contexts[thread_root][-self.max_context_size:]
     
     async def setup_signer(self):
         """Setup or verify signer for the Terroir account"""
@@ -211,6 +242,14 @@ class FarcasterHandler:
     
     async def get_thread_context(self, thread_hash: str) -> str:
         """Get previous messages in thread"""
+        # First check our local thread context
+        if thread_hash in self.thread_contexts:
+            context = "\nRecent thread context:\n"
+            for msg in self.thread_contexts[thread_hash][-3:]:  # Only last 3 messages
+                context += f"- {msg['content']}\n"
+            return context
+            
+        # If not in local context, fetch from API
         headers = {
             "accept": "application/json",
             "api_key": self.api_key
@@ -223,7 +262,6 @@ class FarcasterHandler:
             )
             if response.status_code == 200:
                 thread_data = response.json()
-                # Extract relevant context
                 return thread_data.get("text", "")
             return ""
     
