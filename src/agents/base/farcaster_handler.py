@@ -224,20 +224,20 @@ class FarcasterHandler:
             
             should_respond = False
             parent_hash = None
-            thread_context = None
             
             # Check for direct mentions
             mentioned_profiles = cast_data.get("mentioned_profiles", [])
             if any(profile.get("fid") == int(self.fid) for profile in mentioned_profiles):
                 should_respond = True
-                parent_hash = cast_data.get("hash")  # Hash of the mentioning cast
+                # For direct mentions without a parent, use the mention cast's hash
+                parent_hash = cast_data.get("hash")
                 logger.info(f"Detected direct @terroir mention in cast: {parent_hash}")
             
             # Check if this is a reply to our cast
             parent_author = cast_data.get("parent_author", {})
             if parent_author and str(parent_author.get("fid")) == self.fid:
                 should_respond = True
-                parent_hash = cast_data.get("hash")  # Hash of the replying cast
+                parent_hash = cast_data.get("hash")
                 logger.info(f"Detected reply to our cast: {parent_hash}")
             
             if should_respond:
@@ -246,7 +246,7 @@ class FarcasterHandler:
                     "should_respond": True,
                     "parent_hash": parent_hash,
                     "text": cast_data.get("text"),
-                    "thread_context": thread_context
+                    "is_mention": parent_author is None  # Flag if it's a direct mention
                 }
         
         return None
