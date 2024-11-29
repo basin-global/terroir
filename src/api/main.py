@@ -47,7 +47,7 @@ async def interactive_loop(agent, observer=None):
     
     while True:
         try:
-            user_input = input("\nWhat would you like to know about Terroir? > ").strip()
+            user_input = input("\nHow can I help you ensure resilience? > ").strip()
             
             if user_input.lower() in ['exit', 'quit']:
                 if observer:
