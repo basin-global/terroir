@@ -37,6 +37,7 @@ class FarcasterHandler:
         self.conversation_history = {}
         self.thread_contexts = {}  # Add thread context tracking
         self.max_context_size = 5  # Keep only last 5 messages per thread
+        self.thread_history = {}  # Add thread history tracking
         
     async def format_response(self, response: str, agent_name: str) -> str:
         """Format response with agent attribution for Farcaster"""
@@ -79,8 +80,14 @@ class FarcasterHandler:
             ]
     
     async def post_cast(self, content: str, agent_name: str, reply_to: Optional[str] = None) -> dict:
-        """Post a cast using Neynar API v2"""
+        """Post a cast using Neynar API"""
         formatted_content = await self.format_response(content, agent_name)
+        
+        headers = {
+            "accept": "application/json",
+            "api_key": self.api_key,
+            "content-type": "application/json"
+        }
         
         data = {
             "text": formatted_content,
@@ -89,13 +96,17 @@ class FarcasterHandler:
         }
         
         if reply_to:
-            # Get parent cast details first
-            parent_cast = await self.get_cast_details(reply_to)
-            if parent_cast:
-                data["parent"] = reply_to
-                # Store thread metadata
-                thread_root = parent_cast.get("thread", {}).get("root_hash") or reply_to
-                await self.track_thread_context(thread_root, reply_to, formatted_content)
+            # Track this reply in thread history
+            if reply_to not in self.thread_history:
+                self.thread_history[reply_to] = []
+            self.thread_history[reply_to].append(formatted_content)
+            
+            # Keep only last 5 messages in thread
+            if len(self.thread_history[reply_to]) > 5:
+                self.thread_history[reply_to].pop(0)
+                
+            data["parent"] = reply_to
+            logger.info(f"Replying to cast with parent: {reply_to}")
         
         logger.info(f"Sending cast data: {data}")
             
