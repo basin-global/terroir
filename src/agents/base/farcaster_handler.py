@@ -32,6 +32,10 @@ class FarcasterHandler:
         }
         self.request_history = defaultdict(list)
         
+        # Add max history size
+        self.max_history_size = 5
+        self.conversation_history = {}
+        
     async def format_response(self, response: str, agent_name: str) -> str:
         """Format response with agent attribution for Farcaster"""
         max_length = 320
@@ -343,3 +347,34 @@ class FarcasterHandler:
             - Be bold and authentic
             - Don't use phrases like "let me explain" or "I can provide"
             """
+    
+    def get_conversation_context(self, thread_id):
+        # Get only recent messages for the specific thread
+        history = self.conversation_history.get(thread_id, [])[-self.max_history_size:]
+        return history
+    
+    def update_conversation_history(self, thread_id, message):
+        # Initialize thread history if needed
+        if thread_id not in self.conversation_history:
+            self.conversation_history[thread_id] = []
+            
+        # Add new message and maintain max size
+        self.conversation_history[thread_id].append(message)
+        if len(self.conversation_history[thread_id]) > self.max_history_size:
+            self.conversation_history[thread_id].pop(0)
+    
+    async def prepare_query_prompt(self, query: str, memory_context: str, reply_to: Optional[str] = None) -> str:
+        """Prepare the complete prompt for Claude including context and instructions"""
+        thread_context = ""
+        if reply_to:
+            thread_context = await self.get_thread_context(reply_to)
+        
+        base_prompt = await self.get_prompt(query, memory_context, reply_to)
+        
+        return f"""
+        Query: {query}
+
+        Thread Context: {thread_context}
+
+        {base_prompt}
+        """

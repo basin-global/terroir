@@ -26,6 +26,9 @@ class TerroirAgent:
             signer_uuid=config.NEYNAR_SIGNER_UUID,
             webhook_secret=config.NEYNAR_WEBHOOK_SECRET
         )
+        
+        # Add memory management
+        self.max_prompt_size = 2000  # Characters
 
     async def initialize(self):
         """Initialize async components"""
@@ -112,7 +115,6 @@ class TerroirAgent:
     async def process_farcaster_query(self, query: str, reply_to: Optional[str] = None, raw: bool = False) -> str:
         """Process query and post response to Farcaster"""
         if raw:
-            # Skip Claude processing, post exactly as written
             await self.farcaster.post_cast(
                 content=query,
                 agent_name="terroir",
@@ -120,10 +122,17 @@ class TerroirAgent:
             )
             return query
             
-        # Regular processing for non-raw casts...
-        memory_context = self.memory_manager.get_context()
-        farcaster_prompt = await self.farcaster.get_prompt(query, memory_context, reply_to)
-        response = await self.process_query(query + "\n\n" + farcaster_prompt)
+        # Let FarcasterHandler handle the prompt preparation
+        farcaster_prompt = await self.farcaster.prepare_query_prompt(
+            query=query,
+            memory_context=self.memory_manager.get_context(),
+            reply_to=reply_to
+        )
+        
+        # Process with Claude
+        response = await self.process_query(farcaster_prompt)
+        
+        # Post response
         await self.farcaster.post_cast(
             content=response,
             agent_name="terroir",
