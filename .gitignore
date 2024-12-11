@@ -55,3 +55,7 @@ src/config/*
 # MacOS
 .DS_Store
 **/.DS_Store
+
+# Examples
+examples/test_*.py
+**/test_*.py

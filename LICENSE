@@ -1,0 +1,32 @@
+GNU GENERAL PUBLIC LICENSE Version 3
+Copyright (c) 2024
+
+This project is primarily licensed under the GNU General Public License v3.0.
+
+Component-specific licenses:
+
+1. SITUS Protocol: GNU General Public License v3.0
+2. Tokenbound Components: MIT License
+3. BASIN Natural Capital Components: CC BY-NC-SA 4.0 
+   (Used with permission from BASIN LLC - https://docs.basin.global/dossier/formalities/license)
+
+For the full text of the GNU General Public License v3.0, visit:
+https://www.gnu.org/licenses/gpl-3.0.en.html
+
+For the full text of the MIT License, visit:
+https://opensource.org/licenses/MIT
+
+For the full text of the CC BY-NC-SA 4.0 License, visit:
+https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+------------------------
+
+Additional Terms for BASIN Components:
+The BASIN Natural Capital components are subject to NonCommercial (NC) restrictions 
+which prohibit the following activities without prior written consent:
+
+- Selling or monetizing any data, calculations, methods, or results derived from this work
+- Use of this work in paid valuation or other real estate or natural capital services
+- Any form of property marketing or sales using information, data, or methods from this work
+- The creation, minting, or sale of environmental assets including carbon, biodiversity, 
+  or ecological credits in any form 
