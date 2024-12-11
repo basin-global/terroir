@@ -1,5 +1,6 @@
 # Environment
 .env
+.env.*
 venv/
 env/
 .python-version
@@ -14,6 +15,8 @@ build/
 # Data files
 data/*.json
 !data/faq_responses.json
+src/data/cache/*.json
+src/data/knowledge/*.json
 
 # Cache
 .cache/
@@ -37,3 +40,18 @@ package.json
 
 # Logs
 *.log
+
+# Security (additional)
+*config.json
+*secrets*
+*credentials*
+*key*
+
+# Config files
+src/config/*
+!src/config/__init__.py
+!src/config/personalities.py
+
+# MacOS
+.DS_Store
+**/.DS_Store
