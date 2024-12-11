@@ -1,3 +1,4 @@
+import os
 import httpx
 from typing import Optional
 from datetime import datetime, timedelta
@@ -12,12 +13,15 @@ from fastapi import Request
 logger = logging.getLogger(__name__)
 
 class FarcasterHandler:
-    def __init__(self, api_key: str, signer_uuid: str = None, webhook_secret: str = None):
-        self.api_key = api_key
+    def __init__(self):
+        self.api_key = os.environ.get('NEYNAR_API_KEY')
+        if not self.api_key:
+            raise ValueError("NEYNAR_API_KEY environment variable is required")
+            
         self.base_url = "https://api.neynar.com/v2"
-        self.fid = "885400"  # @terroir FID
-        self.signer_uuid = signer_uuid
-        self.webhook_secret = webhook_secret  # Store webhook_secret
+        self.fid = os.environ.get('FARCASTER_FID', "885400")  # @terroir FID
+        self.signer_uuid = os.environ.get('NEYNAR_SIGNER_UUID')
+        self.webhook_secret = os.environ.get('NEYNAR_WEBHOOK_SECRET')
         
         # Rate limiting
         self.rate_limits = {

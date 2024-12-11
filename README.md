@@ -15,3 +15,11 @@ AI agent for BASIN and SITUS protocols. Terroir provides:
 - Account information
 - Smart contract interaction
 - Learning and memory systems
+
+# Required Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+ANTHROPIC_API_KEY=your_api_key
+FARCASTER_SIGNER_UUID=your_signer_uuid
+FARCASTER_WEBHOOK_SECRET=your_webhook_secret
+FARCASTER_FID=885400 # Optional, defaults to @terroir FID
